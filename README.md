@@ -31,6 +31,40 @@ Runtime commands:
 - `/ponytail lite|full|ultra|off` — set current Ponytail mode.
 - `/caveman` or `/caveman status` — show Caveman ultra state.
 - `/caveman on|off` — enable or disable Caveman ultra injection.
+- `/caveman default` — show configured Caveman default.
+- `/caveman default on|off` — set Caveman default.
+
+#### Configuration
+
+Defaults resolve in this order (lowest → highest):
+
+1. **Built-ins** — Ponytail `full`, Caveman enabled.
+2. **Global OMP config** — `~/.omp/agent/ponytail-caveman.json`, or `~/.omp/profiles/<profile>/agent/ponytail-caveman.json` when `OMP_PROFILE` / `PI_PROFILE` is set.
+3. **Nearest repo-local OMP config** — `<repo>/.omp/ponytail-caveman.json` (walks up from the current working directory).
+4. **Environment variables** — `PONYTAIL_DEFAULT_MODE`, `CAVEMAN_DEFAULT_ENABLED`.
+5. **Current session command state** — `/ponytail lite|full|ultra|off` and `/caveman on|off` (session-only; not written to disk).
+
+Example global or repo-local file:
+
+```json
+{
+  "ponytail": {
+    "defaultMode": "ultra"
+  },
+  "caveman": {
+    "enabled": true
+  }
+}
+```
+
+Environment variables override JSON defaults for new sessions:
+
+| Variable | Values | Effect |
+|----------|--------|--------|
+| `PONYTAIL_DEFAULT_MODE` | `lite`, `full`, `ultra`, `off` | Default Ponytail mode |
+| `CAVEMAN_DEFAULT_ENABLED` | `true` / `false`, `on` / `off`, `1` / `0` | Default Caveman injection |
+
+`/ponytail default <mode>` and `/caveman default on|off` persist defaults to the **global** OMP config file only (`~/.omp/agent/ponytail-caveman.json`, or the matching profile path). They never write `<repo>/.omp/ponytail-caveman.json`; edit repo-local files manually for per-project defaults.
 
 Detached skill sources:
 

@@ -8,7 +8,8 @@ const SESSION_ENTRY_TYPE = "ponytail-mode";
 const CAVEMAN_MODE = "ultra";
 const CAVEMAN_MODES = new Set(["lite", "full", "ultra", "wenyan-lite", "wenyan-full", "wenyan-ultra"]);
 const CAVEMAN_SESSION_ENTRY_TYPE = "caveman-mode";
-
+const CONFIG_FILE_NAME = "ponytail-caveman.json";
+const DEFAULT_CAVEMAN_ENABLED = true;
 
 function normalizeMode(mode) {
   if (typeof mode !== "string") return null;
@@ -22,40 +23,135 @@ function normalizeCavemanMode(mode) {
   return CAVEMAN_MODES.has(normalized) ? normalized : null;
 }
 
-
-function configPath() {
-  if (process.platform === "win32") {
-    const root = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-    return path.join(root, "ponytail", "config.json");
-  }
-
-  const root = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-  return path.join(root, "ponytail", "config.json");
+function normalizeBoolean(value) {
+  return typeof value === "boolean" ? value : null;
 }
 
-function getDefaultMode() {
-  const envMode = normalizeMode(process.env.PONYTAIL_DEFAULT_MODE);
-  if (envMode) return envMode;
+function normalizeBooleanEnv(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "on" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "off" || normalized === "0") return false;
+  return null;
+}
+
+function activeAgentDir(env = process.env) {
+  if (env.PI_CODING_AGENT_DIR) return env.PI_CODING_AGENT_DIR;
+
+  const profile = env.OMP_PROFILE || env.PI_PROFILE;
+  if (profile) return path.join(os.homedir(), ".omp", "profiles", profile, "agent");
+
+  return path.join(os.homedir(), ".omp", "agent");
+}
+
+function findProjectConfigPath(cwd) {
+  let dir = path.resolve(cwd || process.cwd());
+
+  for (;;) {
+    const candidate = path.join(dir, ".omp", CONFIG_FILE_NAME);
+    if (fs.existsSync(candidate)) return candidate;
+
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function readJsonConfig(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return { config: {}, warning: null };
 
   try {
-    const parsed = JSON.parse(fs.readFileSync(configPath(), "utf8"));
-    const fileMode = normalizeMode(parsed?.defaultMode);
-    if (fileMode) return fileMode;
+    const config = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return { config: {}, warning: `Invalid ${CONFIG_FILE_NAME}: ${filePath}` };
+    }
+
+    return { config, warning: null };
   } catch {
-    // Missing or invalid config falls back to the built-in default.
+    return { config: {}, warning: `Invalid ${CONFIG_FILE_NAME}: ${filePath}` };
+  }
+}
+
+function applyDefaultConfig(result, filePath, config) {
+  const ponytailMode = normalizeMode(config?.ponytail?.defaultMode);
+  if (ponytailMode) result.ponytailDefaultMode = ponytailMode;
+
+  const cavemanEnabled = normalizeBoolean(config?.caveman?.enabled);
+  if (cavemanEnabled !== null) result.cavemanEnabled = cavemanEnabled;
+
+  result.sources.push(filePath);
+}
+
+function configFilePaths(agentDir, cwd) {
+  const paths = [path.join(agentDir, CONFIG_FILE_NAME), findProjectConfigPath(cwd)].filter(Boolean);
+  return [...new Set(paths)];
+}
+
+export function resolveDefaultConfig({ cwd = process.cwd(), agentDir, env = process.env } = {}) {
+  const resolvedAgentDir = agentDir || activeAgentDir(env);
+  const result = {
+    ponytailDefaultMode: DEFAULT_MODE,
+    cavemanEnabled: DEFAULT_CAVEMAN_ENABLED,
+    sources: [],
+    warnings: [],
+  };
+
+  for (const filePath of configFilePaths(resolvedAgentDir, cwd)) {
+    if (!fs.existsSync(filePath)) continue;
+
+    const { config, warning } = readJsonConfig(filePath);
+    if (warning) {
+      result.warnings.push(warning);
+      continue;
+    }
+
+    applyDefaultConfig(result, filePath, config);
   }
 
-  return DEFAULT_MODE;
+  const envPonytailMode = normalizeMode(env.PONYTAIL_DEFAULT_MODE);
+  if (envPonytailMode) {
+    result.ponytailDefaultMode = envPonytailMode;
+    result.sources.push("env:PONYTAIL_DEFAULT_MODE");
+  }
+
+  const envCavemanEnabled = normalizeBooleanEnv(env.CAVEMAN_DEFAULT_ENABLED);
+  if (envCavemanEnabled !== null) {
+    result.cavemanEnabled = envCavemanEnabled;
+    result.sources.push("env:CAVEMAN_DEFAULT_ENABLED");
+  }
+
+  return result;
+}
+
+function readExistingGlobalConfig(filePath) {
+  const { config } = readJsonConfig(filePath);
+  return config && typeof config === "object" && !Array.isArray(config) ? config : {};
+}
+
+function writeGlobalConfigPatch(patch, agentDir = activeAgentDir()) {
+  const filePath = path.join(agentDir, CONFIG_FILE_NAME);
+  const current = readExistingGlobalConfig(filePath);
+  const merged = { ...current };
+
+  if (patch.ponytail) merged.ponytail = { ...(current.ponytail || {}), ...patch.ponytail };
+  if (patch.caveman) merged.caveman = { ...(current.caveman || {}), ...patch.caveman };
+
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(merged, null, 2)}\n`);
+  return merged;
 }
 
 function writeDefaultMode(mode) {
   const normalizedMode = normalizeMode(mode);
   if (!normalizedMode) return null;
-
-  const target = configPath();
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${JSON.stringify({ defaultMode: normalizedMode }, null, 2)}\n`);
+  writeGlobalConfigPatch({ ponytail: { defaultMode: normalizedMode } });
   return normalizedMode;
+}
+
+function writeDefaultCavemanEnabled(enabled) {
+  const normalizedEnabled = Boolean(enabled);
+  writeGlobalConfigPatch({ caveman: { enabled: normalizedEnabled } });
+  return normalizedEnabled;
 }
 
 export function parsePonytailCommand(text, defaultMode = DEFAULT_MODE) {
@@ -87,6 +183,11 @@ export function parseCavemanCommand(text) {
   if (args.length === 0 || (args.length === 1 && args[0] === "status")) return { type: "status" };
   if (args.length === 1 && args[0] === "on") return { type: "set-enabled", enabled: true };
   if (args.length === 1 && args[0] === "off") return { type: "set-enabled", enabled: false };
+  if (args.length === 1 && args[0] === "default") return { type: "default-status" };
+  if (args.length === 2 && args[0] === "default") {
+    if (args[1] === "on") return { type: "set-default-enabled", enabled: true };
+    if (args[1] === "off") return { type: "set-default-enabled", enabled: false };
+  }
   return { type: "unknown" };
 }
 
@@ -102,7 +203,7 @@ export function resolveSessionMode(entries, fallbackMode = DEFAULT_MODE) {
   return normalizeMode(fallbackMode) || DEFAULT_MODE;
 }
 
-export function resolveCavemanEnabled(entries, fallbackEnabled = true) {
+export function resolveCavemanEnabled(entries, fallbackEnabled = DEFAULT_CAVEMAN_ENABLED) {
   const list = Array.isArray(entries) ? entries : [];
   for (let index = list.length - 1; index >= 0; index -= 1) {
     const entry = list[index];
@@ -175,7 +276,7 @@ function getFallbackInstructions(mode) {
 }
 
 function skillPaths(name) {
-  const piAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".omp", "agent");
+  const piAgentDir = activeAgentDir();
   return [
     path.join(piAgentDir, "skills", name, "SKILL.md"),
     path.join(os.homedir(), ".agents", "skills", name, "SKILL.md"),
@@ -200,7 +301,6 @@ function readFirstSkill(name) {
   skillBodyCache.set(name, null);
   return null;
 }
-
 
 export function getPonytailInstructions(mode) {
   const effectiveMode = normalizeMode(mode) || DEFAULT_MODE;
@@ -233,7 +333,6 @@ function buildBeforeAgentStartContent(ponytailMode, cavemanEnabled) {
   return chunks.join("\n\n---\n\n");
 }
 
-
 function notify(ctx, message, severity = "info") {
   const notifier = ctx?.ui?.notify;
   if (typeof notifier !== "function") return;
@@ -241,9 +340,12 @@ function notify(ctx, message, severity = "info") {
 }
 
 export default function ponytailCavemanExtension(pi) {
-  let configuredDefaultMode = getDefaultMode();
+  let resolvedDefaults = resolveDefaultConfig();
+  let configuredDefaultMode = resolvedDefaults.ponytailDefaultMode;
+  let configuredCavemanEnabled = resolvedDefaults.cavemanEnabled;
   let currentMode = configuredDefaultMode;
-  let cavemanEnabled = true;
+  let cavemanEnabled = configuredCavemanEnabled;
+
   function setCurrentMode(mode, ctx) {
     const normalizedMode = normalizeMode(mode);
     if (!normalizedMode) return false;
@@ -259,7 +361,6 @@ export default function ponytailCavemanExtension(pi) {
     pi.appendEntry(CAVEMAN_SESSION_ENTRY_TYPE, { enabled: cavemanEnabled });
     notify(ctx, `Caveman ultra ${cavemanEnabled ? "on" : "off"}.`);
   }
-
 
   pi.registerCommand("ponytail", {
     description: "Set or report Ponytail mode",
@@ -307,22 +408,35 @@ export default function ponytailCavemanExtension(pi) {
         return;
       }
 
+      if (parsed.type === "default-status") {
+        notify(ctx, `Caveman ultra default: ${configuredCavemanEnabled ? "on" : "off"}`);
+        return;
+      }
+
+      if (parsed.type === "set-default-enabled") {
+        configuredCavemanEnabled = writeDefaultCavemanEnabled(parsed.enabled);
+        notify(ctx, `Default Caveman ultra set to ${configuredCavemanEnabled ? "on" : "off"}.`);
+        return;
+      }
+
       if (parsed.type === "set-enabled") {
         setCavemanEnabled(parsed.enabled, ctx);
         return;
       }
 
-      notify(ctx, "Unknown or unsupported /caveman mode. Use /caveman on or /caveman off.", "warning");
+      notify(ctx, "Unknown or unsupported /caveman mode. Use /caveman on, /caveman off, or /caveman default on|off.", "warning");
     },
   });
 
   pi.on("session_start", async (_event, ctx) => {
     const entries = ctx?.sessionManager?.getBranch?.() ?? ctx?.sessionManager?.getEntries?.() ?? [];
-    configuredDefaultMode = getDefaultMode();
+    resolvedDefaults = resolveDefaultConfig({ cwd: ctx?.cwd });
+    for (const warning of resolvedDefaults.warnings) notify(ctx, warning, "warning");
+    configuredDefaultMode = resolvedDefaults.ponytailDefaultMode;
+    configuredCavemanEnabled = resolvedDefaults.cavemanEnabled;
     currentMode = resolveSessionMode(entries, configuredDefaultMode);
-    cavemanEnabled = resolveCavemanEnabled(entries, true);
+    cavemanEnabled = resolveCavemanEnabled(entries, configuredCavemanEnabled);
   });
-
 
   pi.on("before_agent_start", async () => {
     const content = buildBeforeAgentStartContent(currentMode, cavemanEnabled);
