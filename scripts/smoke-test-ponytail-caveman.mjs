@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const extensionPath = process.argv[2] || path.join(ROOT, 'extensions', 'ponytail-caveman.js');
+const extensionPath = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(ROOT, 'extensions', 'ponytail-caveman.js');
 
 if (!fs.existsSync(extensionPath)) {
   throw new Error(`Missing extension: ${extensionPath}`);
