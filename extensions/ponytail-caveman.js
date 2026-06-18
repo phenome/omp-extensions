@@ -1,8 +1,6 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const DEFAULT_MODE = "full";
 const RUNTIME_MODES = new Set(["off", "lite", "full", "ultra"]);
@@ -286,38 +284,6 @@ function skillPaths(name) {
 }
 
 const skillBodyCache = new Map();
-const REQUIRED_SKILLS = ["ponytail", "ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-help", "caveman"];
-const SKILL_AUTO_INSTALL_WARNING = "Ponytail/Caveman skill auto-install failed; using fallback instructions.";
-
-function globalSkillPath(name) {
-  return path.join(os.homedir(), ".agents", "skills", name, "SKILL.md");
-}
-
-function missingRequiredSkills() {
-  return REQUIRED_SKILLS.filter((name) => !fs.existsSync(globalSkillPath(name)));
-}
-
-function skillInstallerPath() {
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "install-ponytail-caveman.mjs");
-}
-
-function ensureRequiredSkills(ctx) {
-  if (missingRequiredSkills().length === 0) return;
-
-  const installerPath = skillInstallerPath();
-  if (!fs.existsSync(installerPath)) {
-    notify(ctx, SKILL_AUTO_INSTALL_WARNING, "warning");
-    return;
-  }
-
-  const result = spawnSync(process.execPath, [installerPath], { stdio: "inherit" });
-  if (result.error || result.status !== 0) {
-    notify(ctx, SKILL_AUTO_INSTALL_WARNING, "warning");
-    return;
-  }
-
-  skillBodyCache.clear();
-}
 
 function readFirstSkill(name) {
   if (skillBodyCache.has(name)) return skillBodyCache.get(name);
@@ -463,7 +429,6 @@ export default function ponytailCavemanExtension(pi) {
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    ensureRequiredSkills(ctx);
     const entries = ctx?.sessionManager?.getBranch?.() ?? ctx?.sessionManager?.getEntries?.() ?? [];
     resolvedDefaults = resolveDefaultConfig({ cwd: ctx?.cwd });
     for (const warning of resolvedDefaults.warnings) notify(ctx, warning, "warning");

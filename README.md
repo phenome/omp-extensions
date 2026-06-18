@@ -14,16 +14,20 @@ Restart Oh My Pi after installing.
 
 **Extension** — OMP reads the plugin manifest in `package.json` (`omp.extensions`) and loads bundled extensions automatically. No manual copying into an extensions folder.
 
-**Detached skills** — Ponytail and Caveman run as separate global skills (installed via the `skills` CLI). They are ensured automatically:
+**Detached skills are mandatory.** The extension reads Ponytail and Caveman from global `skills` CLI installs; it does not vendor them and it does not install them during OMP sessions.
 
-1. **Postinstall** — When lifecycle scripts run, `postinstall` executes `scripts/install-ponytail-caveman.mjs` (`bunx` when available, otherwise `npx -y`).
-2. **Runtime bootstrap** — On first OMP startup, the extension checks for missing skills and runs the same install script if needed.
-
-If lifecycle scripts are disabled (for example `--ignore-scripts`), run the installer manually from the plugin directory:
+Install both required skill sets immediately after plugin install:
 
 ```sh
-node scripts/install-ponytail-caveman.mjs
+node ~/.omp/plugins/node_modules/omp-extensions/scripts/install-ponytail-caveman.mjs
 ```
+
+That script installs:
+
+- Ponytail skills with `skills add DietrichGebert/ponytail -g --skill '*' -y`
+- Caveman with `skills add https://github.com/juliusbrussee/caveman -g --skill caveman -y`
+
+`package.json` also includes a `postinstall` script for this step, but Bun may block dependency lifecycle scripts until trusted. Treat the explicit command above as the reliable install step.
 
 Future extensions in this package follow the same pattern: install via `omp plugin install`, optional postinstall setup for external dependencies.
 
