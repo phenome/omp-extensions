@@ -179,10 +179,11 @@ try {
   assert.equal(commands.has('caveman'), true);
   assertCompletions(commands.get('ponytail'), '', ['status', 'help', 'on', 'off', 'lite', 'full', 'ultra', 'global', 'repo', 'install-skills']);
   assertCompletions(commands.get('ponytail'), 'g', ['global']);
-  assertCompletions(commands.get('ponytail'), 'repo ', ['on', 'off', 'lite', 'full', 'ultra']);
+  assertCompletions(commands.get('ponytail'), 'repo ', ['repo on', 'repo off', 'repo lite', 'repo full', 'repo ultra']);
+  assertCompletions(commands.get('ponytail'), 'global u', ['global ultra']);
   assertCompletions(commands.get('caveman'), '', ['status', 'help', 'on', 'off', 'lite', 'full', 'ultra', 'wenyan-lite', 'wenyan-full', 'wenyan-ultra', 'global', 'repo', 'install-skills']);
   assertCompletions(commands.get('caveman'), 'w', ['wenyan-lite', 'wenyan-full', 'wenyan-ultra']);
-  assertCompletions(commands.get('caveman'), 'global w', ['wenyan-lite', 'wenyan-full', 'wenyan-ultra']);
+  assertCompletions(commands.get('caveman'), 'global w', ['global wenyan-lite', 'global wenyan-full', 'global wenyan-ultra']);
 
   await events.get('session_start')({}, ctx);
   assert.equal(widgets.at(-1).id, 'ponytail-caveman');

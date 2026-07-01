@@ -410,11 +410,12 @@ function scopedCommandValues(tool) {
 function completions(tool, argumentPrefix = "") {
   const prefix = String(argumentPrefix || "").trimStart().toLowerCase();
   const [first, rest = ""] = prefix.split(/\s+/, 2);
-  const values = ["global", "repo"].includes(first) ? scopedCommandValues(tool) : commandValues(tool);
-  const activePrefix = ["global", "repo"].includes(first) ? rest : first;
+  const scoped = ["global", "repo"].includes(first);
+  const values = scoped ? scopedCommandValues(tool) : commandValues(tool);
+  const activePrefix = scoped ? rest : first;
   return values
     .filter((value) => value.startsWith(activePrefix))
-    .map((value) => ({ label: value, value }));
+    .map((value) => ({ label: value, value: scoped ? `${first} ${value}` : value }));
 }
 
 function run(command, args) {
