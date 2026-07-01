@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SMOKE_TEST = path.join(ROOT, 'scripts', 'smoke-test-ponytail-caveman.mjs');
 const IS_WINDOWS = process.platform === 'win32';
 
 function canRun(command) {
@@ -32,6 +27,4 @@ const skills = (...args) => run(runner.command, [...runner.prefix, ...args], { s
 skills('add', 'DietrichGebert/ponytail', '-g', '--skill', '*', '-y');
 skills('add', 'https://github.com/juliusbrussee/caveman', '-g', '--skill', 'caveman', '-y');
 
-run(process.execPath, [SMOKE_TEST]);
-
-console.log('Detached skills installed. ponytail-caveman smoke test passed.');
+console.log('Detached Ponytail/Caveman skills installed.');

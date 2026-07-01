@@ -29,8 +29,8 @@ Static tab completion for valid slash-command arguments. It suggests known token
 _Avoid_: Autocomplete UI, suggestion engine
 
 **Plugin Package**:
-The installable OMP plugin package for this repo. Its package name matches the repository name `omp-ponytail-caveman`.
-_Avoid_: Extension package, extension repo, feature name
+The installable OMP plugin package for this repo. Its npm package name is the unscoped repo name `omp-ponytail-caveman`.
+_Avoid_: Scoped package name, extension package, feature name
 
 **Status Surface**:
 The UI places where active state appears: a persistent widget plus command-change notifications. Bare status commands report current session state, all configured scopes, and concise command usage.

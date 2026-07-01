@@ -4,15 +4,29 @@ Ponytail + Caveman extension for [Oh My Pi](https://github.com/can1357/oh-my-pi)
 
 ## Install
 
+Install from npm:
+
+```sh
+omp plugin install omp-ponytail-caveman
+```
+
+GitHub installs still work for unreleased commits:
+
 ```sh
 omp plugin install github:phenome/omp-ponytail-caveman
+```
+
+Local development:
+
+```sh
+omp plugin link /path/to/omp-ponytail-caveman
 ```
 
 Restart Oh My Pi after installing.
 
 **Plugin** — OMP reads `package.json` (`omp.extensions`) and loads `omp-ponytail-caveman` automatically.
 
-**Detached skills are mandatory.** The extension reads Ponytail and Caveman from global `skills` CLI installs; it does not vendor them. `postinstall` tries to install or refresh them, but dependency lifecycle scripts may be blocked. If skills are missing or stale, run either command:
+**Detached skills are mandatory.** The plugin reads Ponytail and Caveman from global `skills` CLI installs; it does not vendor them. `postinstall` tries to install or refresh them, but dependency lifecycle scripts may be blocked. If skills are missing or stale, run either command:
 
 ```sh
 /ponytail install-skills
@@ -20,8 +34,6 @@ Restart Oh My Pi after installing.
 ```
 
 Both commands refresh both upstream skill sets.
-
-This repo ships only `omp-ponytail-caveman`.
 
 ## Plugin
 
@@ -91,7 +103,14 @@ omp plugin uninstall omp-ponytail-caveman
 
 ## Updating
 
-For GitHub installs, clean reinstall is the reliable update path because the plugin manager has no dedicated update command and repeated installs may keep the existing Bun git checkout:
+For npm installs:
+
+```sh
+omp plugin uninstall omp-ponytail-caveman
+omp plugin install omp-ponytail-caveman
+```
+
+For GitHub installs, clean reinstall is the reliable update path because the plugin manager may keep the existing Bun git checkout:
 
 ```sh
 omp plugin uninstall omp-ponytail-caveman
@@ -107,3 +126,16 @@ To refresh detached skills:
 # or
 /caveman install-skills
 ```
+
+## Publishing
+
+Manual first publish:
+
+```sh
+npm login
+npm run smoke
+npm pack --dry-run
+npm publish
+```
+
+Publish package name is unscoped: `omp-ponytail-caveman`.
